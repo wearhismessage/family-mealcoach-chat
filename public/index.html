@@ -8,32 +8,36 @@
     :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
     body { margin:0; background:#0b1020; color:#e8ecf1; display:flex; flex-direction:column; height:100vh; }
     header { padding:14px 18px; background:#0f1630; border-bottom:1px solid #1f2a4a; font-weight:700; }
+    #banner { display:none; background:#123; color:#cfe3ff; padding:8px 14px; font-size:12px; border-bottom:1px solid #1f2a4a; }
+    .row { display:flex; gap:8px; align-items:center; padding:10px 12px; background:#0f1630; border-bottom:1px solid #1f2a4a; flex-wrap:wrap; }
+    .small { font-size:12px; opacity:0.9; }
+    select, input[type="password"], button {
+      padding:10px 14px; border-radius:10px; border:1px solid #3952a3; background:#2340a0; color:#fff; font-weight:600;
+    }
     #chat { flex:1; overflow:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
     .msg { padding:12px 14px; border-radius:14px; max-width: 900px; white-space:pre-wrap; line-height:1.45; }
     .user { align-self:flex-end; background:#25325a; }
     .ai { align-self:flex-start; background:#182042; }
     form { display:flex; gap:8px; padding:12px; background:#0f1630; border-top:1px solid #1f2a4a; }
     textarea { flex:1; resize:none; padding:12px; border-radius:12px; border:1px solid #25325a; background:#0b1020; color:#e8ecf1; min-height:56px; }
-    button, select, input[type="password"] {
-      padding:10px 14px; border-radius:10px; border:1px solid #3952a3; background:#2340a0; color:#fff; font-weight:600;
-    }
-    .row { display:flex; gap:8px; align-items:center; padding:10px 12px; background:#0f1630; border-bottom:1px solid #1f2a4a; }
     .hint { color:#9fb0d9; font-size:12px; padding:4px 16px 10px; }
     .toolbar { margin-left:auto; display:flex; gap:8px; align-items:center; }
-    .small { font-size:12px; opacity:0.9; }
+    #model-indicator { font-size:12px; color:#9fb0d9; padding:6px 12px; }
   </style>
 </head>
 <body>
   <header>Family Meal Coach Chat</header>
+  <div id="banner"></div>
 
   <div class="row">
-    <div class="small">Model:</div>
-   <select id="model">
-  <option value="gpt-4o" selected>gpt-4o (recommended)</option>
-  <option value="gpt-4o-mini">gpt-4o-mini (cheaper)</option>
-  <option value="gpt-5">gpt-5 (if your key has access)</option>
-</select>
+    <div class="small">Preferred model:</div>
+    <select id="model">
+      <option value="gpt-4o" selected>gpt-4o (recommended)</option>
+      <option value="gpt-4o-mini">gpt-4o-mini (cheaper)</option>
+      <option value="gpt-5">gpt-5 (if available)</option>
+    </select>
 
+    <div id="model-indicator">(actual model: …)</div>
 
     <div class="toolbar">
       <input id="secret" type="password" placeholder="Family password (optional)" />
@@ -56,16 +60,32 @@
     const modelSel = document.getElementById('model');
     const resetBtn = document.getElementById('reset');
     const secretEl = document.getElementById('secret');
+    const banner = document.getElementById('banner');
+    const modelIndicator = document.getElementById('model-indicator');
 
+    // Load saved state
     let messages = JSON.parse(localStorage.getItem('fam_msgs') || '[]');
-    modelSel.value = localStorage.getItem('fam_model') || 'gpt-5';
-    secretEl.value = localStorage.getItem('fam_secret') || '';
+
+    // Force default to gpt-4o if saved was gpt-5 or missing
+    (function initModelSelect(){
+      const saved = localStorage.getItem('fam_model');
+      if (!saved || saved === 'gpt-5') {
+        modelSel.value = 'gpt-4o';
+        localStorage.setItem('fam_model', 'gpt-4o');
+      } else {
+        modelSel.value = saved;
+      }
+      secretEl.value = localStorage.getItem('fam_secret') || '';
+      modelIndicator.textContent = '(actual model: checking…)';
+    })();
+
     renderAll();
 
     resetBtn.onclick = () => {
       messages = [];
       localStorage.setItem('fam_msgs', JSON.stringify(messages));
       renderAll();
+      showBanner('Chat history cleared.', 2000);
     };
 
     modelSel.onchange = () => localStorage.setItem('fam_model', modelSel.value);
@@ -84,20 +104,39 @@
       const headers = { 'Content-Type': 'application/json' };
       if (secretEl.value) headers['x-family-secret'] = secretEl.value;
 
-      const resp = await fetch('/api/chat', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ messages, model: modelSel.value })
-      });
+      let resp;
+      try {
+        // Note: server is currently hardcoded to gpt-4o; we still send the preferred value for future use
+        resp = await fetch('/api/chat', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ messages, model: modelSel.value })
+        });
+      } catch (err) {
+        aiNode.textContent = 'Network error. Please try again.';
+        return;
+      }
+
+      // Header hint from server (chosen model, for sanity)
+      const headerUsed = resp.headers.get('x-model-used');
+      if (headerUsed) {
+        modelIndicator.textContent = `(actual model: ${headerUsed})`;
+      }
 
       if (!resp.ok || !resp.body) {
-        aiNode.textContent = 'Sorry — the server returned an error.';
+        try {
+          const errJson = await resp.json();
+          aiNode.textContent = (errJson && errJson.error) ? `Sorry — ${errJson.error}` : 'Sorry — the server returned an error.';
+        } catch {
+          aiNode.textContent = 'Sorry — the server returned an error.';
+        }
         return;
       }
 
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let actualModelFromStream = null;
 
       try {
         while (true) {
@@ -105,6 +144,7 @@
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
 
+          // Parse SSE: lines starting with "data:"
           let idx;
           while ((idx = buffer.indexOf('\n')) >= 0) {
             const line = buffer.slice(0, idx).trim();
@@ -116,12 +156,19 @@
 
             try {
               const evt = JSON.parse(data);
+
+              // >>> Capture the actual model reported by OpenAI in the SSE chunk
+              if (!actualModelFromStream && evt?.model) {
+                actualModelFromStream = evt.model;
+                modelIndicator.textContent = `(actual model: ${actualModelFromStream})`;
+              }
+
               const chunk = evt.choices?.[0]?.delta?.content || '';
               if (chunk) aiNode.textContent += chunk;
-            } catch { /* ignore parse errors */ }
+            } catch { /* ignore parse hiccups */ }
           }
         }
-      } catch (e) {
+      } catch {
         aiNode.textContent += '\n[Stream ended unexpectedly]';
       }
 
@@ -150,6 +197,25 @@
         chatEl.appendChild(div);
       }
       chatEl.scrollTop = chatEl.scrollHeight;
+
+      if (messages.length === 0) {
+        addMessage('assistant',
+`Hi! I’m your nutrition coach. Tell me:
+• Calories & macro targets (protein/carbs/fat)
+• Foods you like/avoid
+• Cooking time & budget
+• Number of meals/day
+
+I’ll build and fine-tune a plan you can actually follow.`);
+      }
+    }
+
+    function showBanner(text, timeoutMs) {
+      banner.textContent = text;
+      banner.style.display = 'block';
+      if (timeoutMs) {
+        setTimeout(() => { banner.style.display = 'none'; }, timeoutMs);
+      }
     }
 
     // Enter to send, Shift+Enter newline
@@ -159,18 +225,6 @@
         form.requestSubmit();
       }
     });
-
-    // First-time helper message
-    if (messages.length === 0) {
-      addMessage('assistant',
-`Hi! I’m your nutrition coach. Tell me:
-• Calories & macro targets (protein/carbs/fat)
-• Foods you like/avoid
-• Cooking time & budget
-• Number of meals/day
-
-I’ll build and fine-tune a plan you can actually follow.`);
-    }
   </script>
 </body>
 </html>
