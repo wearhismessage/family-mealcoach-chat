@@ -1,0 +1,11 @@
+{
+  "name": "family-mealcoach-chat",
+  "private": true,
+  "version": "1.0.0",
+  "description": "A tiny GPT-5-powered meal coach chat for family, deployable on Vercel.",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo \"No build step\"",
+    "start": "echo \"Use 'vercel dev' for local testing\""
+  }
+}

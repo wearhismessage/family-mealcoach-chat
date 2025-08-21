@@ -1,0 +1,174 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Family Meal Coach Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    body { margin:0; background:#0b1020; color:#e8ecf1; display:flex; flex-direction:column; height:100vh; }
+    header { padding:14px 18px; background:#0f1630; border-bottom:1px solid #1f2a4a; font-weight:700; }
+    #chat { flex:1; overflow:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+    .msg { padding:12px 14px; border-radius:14px; max-width: 900px; white-space:pre-wrap; line-height:1.45; }
+    .user { align-self:flex-end; background:#25325a; }
+    .ai { align-self:flex-start; background:#182042; }
+    form { display:flex; gap:8px; padding:12px; background:#0f1630; border-top:1px solid #1f2a4a; }
+    textarea { flex:1; resize:none; padding:12px; border-radius:12px; border:1px solid #25325a; background:#0b1020; color:#e8ecf1; min-height:56px; }
+    button, select, input[type="password"] {
+      padding:10px 14px; border-radius:10px; border:1px solid #3952a3; background:#2340a0; color:#fff; font-weight:600;
+    }
+    .row { display:flex; gap:8px; align-items:center; padding:10px 12px; background:#0f1630; border-bottom:1px solid #1f2a4a; }
+    .hint { color:#9fb0d9; font-size:12px; padding:4px 16px 10px; }
+    .toolbar { margin-left:auto; display:flex; gap:8px; align-items:center; }
+    .small { font-size:12px; opacity:0.9; }
+  </style>
+</head>
+<body>
+  <header>Family Meal Coach Chat</header>
+
+  <div class="row">
+    <div class="small">Model:</div>
+    <select id="model">
+      <option value="gpt-5" selected>gpt-5 (standard)</option>
+      <option value="gpt-5-mini">gpt-5-mini (cheaper)</option>
+    </select>
+
+    <div class="toolbar">
+      <input id="secret" type="password" placeholder="Family password (optional)" />
+      <button id="reset">Reset chat</button>
+    </div>
+  </div>
+
+  <div id="chat"></div>
+  <div class="hint">Tip: Enter to send • Shift+Enter for a new line</div>
+
+  <form id="composer">
+    <textarea id="input" placeholder="Share calories & macro targets, foods you like/avoid, cooking time, budget, and meals/day..."></textarea>
+    <button type="submit">Send</button>
+  </form>
+
+  <script>
+    const chatEl = document.getElementById('chat');
+    const form = document.getElementById('composer');
+    const input = document.getElementById('input');
+    const modelSel = document.getElementById('model');
+    const resetBtn = document.getElementById('reset');
+    const secretEl = document.getElementById('secret');
+
+    let messages = JSON.parse(localStorage.getItem('fam_msgs') || '[]');
+    modelSel.value = localStorage.getItem('fam_model') || 'gpt-5';
+    secretEl.value = localStorage.getItem('fam_secret') || '';
+    renderAll();
+
+    resetBtn.onclick = () => {
+      messages = [];
+      localStorage.setItem('fam_msgs', JSON.stringify(messages));
+      renderAll();
+    };
+
+    modelSel.onchange = () => localStorage.setItem('fam_model', modelSel.value);
+    secretEl.onchange = () => localStorage.setItem('fam_secret', secretEl.value);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      addMessage('user', text);
+      input.value = '';
+
+      const aiNode = addMessage('assistant', '');
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (secretEl.value) headers['x-family-secret'] = secretEl.value;
+
+      const resp = await fetch('/api/chat', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ messages, model: modelSel.value })
+      });
+
+      if (!resp.ok || !resp.body) {
+        aiNode.textContent = 'Sorry — the server returned an error.';
+        return;
+      }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          let idx;
+          while ((idx = buffer.indexOf('\n')) >= 0) {
+            const line = buffer.slice(0, idx).trim();
+            buffer = buffer.slice(idx + 1);
+            if (!line || !line.startsWith('data:')) continue;
+
+            const data = line.slice(5).trim();
+            if (data === '[DONE]') break;
+
+            try {
+              const evt = JSON.parse(data);
+              const chunk = evt.choices?.[0]?.delta?.content || '';
+              if (chunk) aiNode.textContent += chunk;
+            } catch { /* ignore parse errors */ }
+          }
+        }
+      } catch (e) {
+        aiNode.textContent += '\n[Stream ended unexpectedly]';
+      }
+
+      messages.push({ role: 'assistant', content: aiNode.textContent });
+      localStorage.setItem('fam_msgs', JSON.stringify(messages));
+      chatEl.scrollTop = chatEl.scrollHeight;
+    });
+
+    function addMessage(role, content) {
+      const div = document.createElement('div');
+      div.className = `msg ${role === 'user' ? 'user' : 'ai'}`;
+      div.textContent = content;
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+      messages.push({ role, content });
+      localStorage.setItem('fam_msgs', JSON.stringify(messages));
+      return div;
+    }
+
+    function renderAll() {
+      chatEl.innerHTML = '';
+      for (const m of messages) {
+        const div = document.createElement('div');
+        div.className = `msg ${m.role === 'user' ? 'user' : 'ai'}`;
+        div.textContent = m.content;
+        chatEl.appendChild(div);
+      }
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    // Enter to send, Shift+Enter newline
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    // First-time helper message
+    if (messages.length === 0) {
+      addMessage('assistant',
+`Hi! I’m your nutrition coach. Tell me:
+• Calories & macro targets (protein/carbs/fat)
+• Foods you like/avoid
+• Cooking time & budget
+• Number of meals/day
+
+I’ll build and fine-tune a plan you can actually follow.`);
+    }
+  </script>
+</body>
+</html>
