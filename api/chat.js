@@ -1,76 +1,94 @@
-// api/chat.js
-// Vercel Serverless Function that proxies to OpenAI with SSE streaming
-// Default model: gpt-5 (standard). You can pass "gpt-5-mini" from the client.
+// api/chat.js — Vercel Edge Function (great for SSE streaming)
+export const config = { runtime: "edge" };
 
-export default async function handler(req, res) {
+export default async function handler(req) {
   if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).send("Method Not Allowed");
+    return new Response("Method Not Allowed", { status: 405, headers: { Allow: "POST" } });
   }
 
   try {
-    // Optional: simple shared secret (set FAMILY_SECRET in Vercel env)
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return json({ error: "Missing OPENAI_API_KEY in server environment." }, 500);
+    }
+
     const familySecret = process.env.FAMILY_SECRET || null;
-    if (familySecret && req.headers["x-family-secret"] !== familySecret) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
 
-    const { messages, model = "gpt-5" } = req.body || {};
+    // Parse body (Edge runtime uses Web API)
+    const body = await req.json().catch(() => ({}));
+    const { messages, model } = body || {};
+
+    if (familySecret && req.headers.get("x-family-secret") !== familySecret) {
+      return json({ error: "Unauthorized" }, 401);
+    }
     if (!Array.isArray(messages)) {
-      return res.status(400).json({ error: "`messages` must be an array" });
+      return json({ error: "`messages` must be an array of chat turns." }, 400);
     }
 
-    // System prompt: a friendly, practical meal-planning coach
+    // Safer default: use a broadly available model first to rule out access issues.
+    // You can change back to "gpt-5" once you confirm access on your key.
+    const chosenModel = model || "gpt-4o";
+
     const sys = {
       role: "system",
       content:
         "You are a supportive, practical nutrition coach. Help the user plan meals that meet daily calorie and macro goals. Use common, affordable foods; provide swaps and grocery tips; ask brief clarifying questions only when truly necessary."
     };
 
-    // Call OpenAI Chat Completions with streaming
+    // Make upstream request to OpenAI (SSE)
     const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model,              // "gpt-5" by default (or "gpt-5-mini" from client)
+        model: chosenModel,
         stream: true,
         temperature: 0.7,
-        // Optional GPT-5 extras you can try later:
-        // reasoning_effort: "minimal",
-        // verbosity: "medium",
         messages: [sys, ...messages]
       })
     });
 
     if (!upstream.ok || !upstream.body) {
-      const detail = await upstream.text().catch(() => "");
-      return res.status(502).json({ error: "Upstream error", detail });
+      const detailText = await readAsText(upstream).catch(() => "");
+      // Return a friendly JSON error to the client
+      const hint =
+        upstream.status === 401
+          ? "Unauthorized. Check OPENAI_API_KEY on Vercel."
+          : upstream.status === 404
+          ? "Model not found/available to your key. Try gpt-4o or gpt-4o-mini."
+          : "See Vercel logs for details.";
+      return json({ error: "Upstream error from OpenAI.", status: upstream.status, hint, detail: detailText }, 502);
     }
 
-    // Forward the SSE stream to the browser
-    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-    res.setHeader("Cache-Control", "no-cache, no-transform");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders?.();
+    // Pass-through SSE stream to browser
+    const resHeaders = new Headers({
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive"
+    });
 
-    const reader = upstream.body.getReader();
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      if (value) res.write(value); // pass-through SSE chunk bytes
-    }
-
-    res.end();
+    // In Edge runtime we can just return the upstream body directly
+    return new Response(upstream.body, { status: 200, headers: resHeaders });
   } catch (err) {
-    console.error(err);
-    if (!res.headersSent) {
-      res.status(500).json({ error: "Server error" });
-    } else {
-      res.end();
-    }
+    return json({ error: "Server error.", detail: String(err?.message || err) }, 500);
   }
+}
+
+// Helpers
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { "Content-Type": "application/json; charset=utf-8" }
+  });
+}
+
+async function readAsText(resp) {
+  const ct = resp.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    const j = await resp.json();
+    return JSON.stringify(j);
+  }
+  return await resp.text();
 }
