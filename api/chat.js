@@ -1,4 +1,4 @@
-// api/chat.js — Vercel Edge Function with auto-fallback from gpt-5 → gpt-4o
+// api/chat.js — Vercel Edge Function, robust errors + optional password
 export const config = { runtime: "edge" };
 
 export default async function handler(req) {
@@ -13,12 +13,30 @@ export default async function handler(req) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return json({ error: "Missing OPENAI_API_KEY in server environment." }, 500);
 
-    const body = await req.json().catch(() => ({}));
     const famSecret = process.env.FAMILY_SECRET || null;
-    if (famSecret && req.headers.get("x-family-secret") !== famSecret) return json({ error: "Unauthorized" }, 401);
+
+    // Parse request body (Edge runtime Web API)
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: "Invalid JSON body." }, 400);
+    }
 
     const { messages, model } = body || {};
     if (!Array.isArray(messages)) return json({ error: "`messages` must be an array of chat turns." }, 400);
+
+    // Optional family password check
+    if (famSecret) {
+      const provided = req.headers.get("x-family-secret") || "";
+      if (provided !== famSecret) {
+        return json({ error: "Unauthorized: wrong or missing family password." }, 401);
+      }
+    }
+
+    // Default to gpt-4o; disable gpt-5 for now (change later when your key has access)
+    const requested = model || "gpt-4o";
+    const chosen = requested === "gpt-5" ? "gpt-4o" : requested;
 
     const sys = {
       role: "system",
@@ -26,54 +44,38 @@ export default async function handler(req) {
         "You are a supportive, practical nutrition coach. Help the user plan meals that meet daily calorie and macro goals. Use common, affordable foods; provide swaps and grocery tips; ask brief clarifying questions only when truly necessary."
     };
 
-    // Try requested model first; if 404/403/401, fallback to gpt-4o
-    const chosen = model || "gpt-4o";
-    const first = await callOpenAI(apiKey, chosen, [sys, ...messages]);
-    if (first.ok) return ssePassThrough(first);
+    // Upstream call (SSE)
+    const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ model: chosen, stream: true, temperature: 0.7, messages: [sys, ...messages] })
+    });
 
-    // Read error details
-    const status = first.status;
-    const detailText = await readAsText(first).catch(() => "");
-    if (status === 404 || status === 401 || status === 403) {
-      const second = await callOpenAI(apiKey, "gpt-4o", [sys, ...messages]);
-      if (second.ok) {
-        // Add a tiny hint header so front-end can show a toast if you want
-        const headers = new Headers({
-          "Content-Type": "text/event-stream; charset=utf-8",
-          "Cache-Control": "no-cache, no-transform",
-          Connection: "keep-alive",
-          "X-Model-Fallback": "gpt-4o"
-        });
-        return new Response(second.body, { status: 200, headers });
-      }
-      const d2 = await readAsText(second).catch(() => "");
-      return json({ error: "OpenAI error (fallback also failed).", detail: d2 }, 502);
+    if (!upstream.ok || !upstream.body) {
+      const detailText = await readAsText(upstream).catch(() => "");
+      const msg =
+        upstream.status === 401
+          ? "OpenAI says Unauthorized (bad or missing API key)."
+          : upstream.status === 404
+          ? "OpenAI says Not Found (model not available to your key)."
+          : "OpenAI upstream error.";
+      return json({ error: msg, status: upstream.status, detail: detailText }, 502);
     }
 
-    return json({ error: "OpenAI upstream error.", status, detail: detailText }, 502);
-  } catch (err) {
-    return new Response(JSON.stringify({ error: "Server error.", detail: String(err?.message || err) }), {
-      status: 500,
-      headers: { "Content-Type": "application/json; charset=utf-8" }
+    // Stream through to client with info header
+    const headers = new Headers({
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Model-Used": chosen
     });
+    return new Response(upstream.body, { status: 200, headers });
+  } catch (err) {
+    return json({ error: "Server error.", detail: String(err?.message || err) }, 500);
   }
-}
-
-function callOpenAI(apiKey, model, messages) {
-  return fetch("https://platform.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model, stream: true, temperature: 0.7, messages })
-  });
-}
-
-function ssePassThrough(upstream) {
-  const headers = new Headers({
-    "Content-Type": "text/event-stream; charset=utf-8",
-    "Cache-Control": "no-cache, no-transform",
-    Connection: "keep-alive"
-  });
-  return new Response(upstream.body, { status: 200, headers });
 }
 
 async function readAsText(resp) {
