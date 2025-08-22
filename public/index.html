@@ -15,7 +15,11 @@
     .user { align-self:flex-end; background:#e6f4ff; color:#1a1a1a; }
     .ai { align-self:flex-start; background:#f1f1f1; color:#1a1a1a; }
     /* only the text is copied; leave room for the icon button on the right */
-    .msg .content { white-space:pre-wrap; padding-right:48px; }
+    .msg .content { 
+  white-space: pre-wrap; 
+  padding-right: 48px; 
+  padding-bottom: 36px;  /* added */
+}
 
     #composerWrap { background:#fff; border-top:1px solid #e6e6e6; padding:12px; }
     #composer { display:flex; gap:8px; max-width: 980px; margin:0 auto; }
@@ -27,16 +31,26 @@
     .linkish:hover { background:#dff2ea; }
 
     /* per-bubble copy ICON button */
-    .copyBtn {
-      position:absolute; top:6px; right:8px;
-      width:auto; /* prevent mobile full-width */
-      display:inline-flex; align-items:center; justify-content:center;
-      padding:6px; border-radius:8px;
-      background:#eef7f3; color:#0d876a; border:1px solid #cfe7dd; cursor:pointer;
-      line-height:0;  /* icon-only */
-    }
-    .copyBtn:hover { background:#dff2ea; }
-    .copyBtn svg { width:16px; height:16px; }
+.copyBtn {
+  position: absolute;
+  bottom: 8px;      /* changed: was top */
+  right: 8px;
+  top: auto;        /* ensure top is unset */
+  width: auto;      /* prevent full-width on mobile */
+  display: inline-flex; 
+  align-items: center; 
+  justify-content: center;
+  padding: 6px; 
+  border-radius: 8px;
+  background: #eef7f3; 
+  color: #0d876a; 
+  border: 1px solid #cfe7dd; 
+  cursor: pointer;
+  line-height: 0;   /* icon-only */
+}
+.copyBtn:hover { background:#dff2ea; }
+.copyBtn svg { width:16px; height:16px; }
+
 
     /* a11y helper (for screen readers if needed later) */
     .sr-only {
