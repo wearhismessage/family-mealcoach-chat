@@ -26,6 +26,26 @@
       #composer { flex-direction:column; }
       button { width:100%; }
     }
+
+    /* thinking: animated . .. ... indicator */
+    .thinking {
+      display:none;                 /* hidden by default */
+      opacity:.75;
+      margin:6px 16px;              /* aligns with chat padding */
+      font-size:14px;
+      align-self:flex-start;        /* appear on AI side */
+      color:#444;
+    }
+    .thinking::after {
+      content:"...";
+      animation:dots 1s steps(3,end) infinite;
+    }
+    @keyframes dots {
+      0%   { content:"." }
+      33%  { content:".." }
+      66%  { content:"..." }
+      100% { content:"" }
+    }
   </style>
 </head>
 <body>
@@ -36,6 +56,9 @@
   </div>
 
   <div id="chat"></div>
+
+  <!-- thinking: lives under the chat, shows while waiting -->
+  <div id="thinking" class="thinking" aria-live="polite">Thinking</div>
 
   <div id="composerWrap">
     <form id="composer">
@@ -55,6 +78,7 @@
     const sendBtn  = document.getElementById('send');
     const resetBtn = document.getElementById('reset');
     const modelUsedEl = document.getElementById('modelUsed');
+    const thinkingEl  = document.getElementById('thinking'); // thinking
 
     // Load or seed chat history
     let messages = [];
@@ -105,6 +129,10 @@ I’ll build and fine-tune a meal plan you can actually follow.`
       appendMessage('user', text);
       input.value = '';
 
+      // thinking: show indicator and disable inputs
+      showThinking(true);
+      disableComposer(true);
+
       // Call your API with the CORRECT shape: { messages, model }
       let resp;
       try {
@@ -115,6 +143,10 @@ I’ll build and fine-tune a meal plan you can actually follow.`
         });
       } catch {
         appendMessage('assistant', 'Sorry — network error. Try again.');
+        messages.push({ role: 'assistant', content: 'Sorry — network error. Try again.' });
+        persist();
+        showThinking(false);      // thinking: hide
+        disableComposer(false);   // thinking: re-enable
         return;
       }
 
@@ -127,6 +159,8 @@ I’ll build and fine-tune a meal plan you can actually follow.`
         appendMessage('assistant', errText);
         messages.push({ role: 'assistant', content: errText });
         persist();
+        showThinking(false);      // thinking: hide
+        disableComposer(false);   // thinking: re-enable
         return;
       }
 
@@ -139,6 +173,10 @@ I’ll build and fine-tune a meal plan you can actually follow.`
       appendMessage('assistant', reply);
       messages.push({ role: 'assistant', content: reply });
       persist();
+
+      // thinking: hide and re-enable
+      showThinking(false);
+      disableComposer(false);
     });
 
     // Helpers
@@ -159,6 +197,20 @@ I’ll build and fine-tune a meal plan you can actually follow.`
       localStorage.setItem('fam_msgs', JSON.stringify(messages));
     }
 
+    // thinking: tiny helpers
+    function showThinking(show) {
+      if (!thinkingEl) return;
+      thinkingEl.style.display = show ? 'inline-block' : 'none';
+      // keep it near the latest messages
+      if (show) {
+        thinkingEl.scrollIntoView({ block: 'end' });
+      }
+    }
+    function disableComposer(disabled) {
+      input.disabled = disabled;
+      sendBtn.disabled = disabled;
+    }
+
     // Send on Enter (Shift+Enter = newline)
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -169,8 +221,3 @@ I’ll build and fine-tune a meal plan you can actually follow.`
   </script>
 </body>
 </html>
-
-
-
-
-
