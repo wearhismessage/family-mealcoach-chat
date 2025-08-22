@@ -46,24 +46,6 @@
       66%  { content:"..." }
       100% { content:"" }
     }
-
-    /* === Copy button (small, neutral) === */
-    .copy-btn {
-      margin-top:8px;
-      padding:6px 10px;
-      font-size:12px;
-      line-height:1;
-      border:1px solid #d6d6d6;
-      border-radius:8px;
-      background:#ffffff;
-      color:#222;
-      cursor:pointer;
-    }
-    .copy-btn:hover { background:#f0f0f0; }
-    .copy-row {
-      display:flex;
-      justify-content:flex-end;
-    }
   </style>
 </head>
 <body>
@@ -129,4 +111,113 @@ I’ll build and fine-tune a meal plan you can actually follow.`
 • Cooking time & budget
 • Number of meals/day
 
-I’ll build and fine-
+I’ll build and fine-tune a meal plan you can actually follow.`
+      }];
+      persist();
+      renderAll();
+      modelUsedEl.textContent = '(actual model: checking…)';
+    };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      // Add user message locally
+      messages.push({ role: 'user', content: text });
+      persist();
+      appendMessage('user', text);
+      input.value = '';
+
+      // thinking: show indicator and disable inputs
+      showThinking(true);
+      disableComposer(true);
+
+      // Call your API with the CORRECT shape: { messages, model }
+      let resp;
+      try {
+        resp = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages, model: 'gpt-4o' }) // locked to 4o
+        });
+      } catch {
+        appendMessage('assistant', 'Sorry — network error. Try again.');
+        messages.push({ role: 'assistant', content: 'Sorry — network error. Try again.' });
+        persist();
+        showThinking(false);      // thinking: hide
+        disableComposer(false);   // thinking: re-enable
+        return;
+      }
+
+      if (!resp.ok) {
+        let errText = 'Sorry — the server returned an error.';
+        try {
+          const j = await resp.json();
+          if (j?.error) errText = `Sorry — ${j.error}`;
+        } catch {}
+        appendMessage('assistant', errText);
+        messages.push({ role: 'assistant', content: errText });
+        persist();
+        showThinking(false);      // thinking: hide
+        disableComposer(false);   // thinking: re-enable
+        return;
+      }
+
+      const data = await resp.json();
+      if (data?.model_used) {
+        modelUsedEl.textContent = `(actual model: ${data.model_used})`;
+      }
+
+      const reply = data?.reply || '…';
+      appendMessage('assistant', reply);
+      messages.push({ role: 'assistant', content: reply });
+      persist();
+
+      // thinking: hide and re-enable
+      showThinking(false);
+      disableComposer(false);
+    });
+
+    // Helpers
+    function appendMessage(role, text) {
+      const div = document.createElement('div');
+      div.className = `msg ${role === 'user' ? 'user' : 'ai'}`;
+      div.textContent = text;
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    function renderAll() {
+      chatEl.innerHTML = '';
+      for (const m of messages) appendMessage(m.role, m.content);
+    }
+
+    function persist() {
+      localStorage.setItem('fam_msgs', JSON.stringify(messages));
+    }
+
+    // thinking: tiny helpers
+    function showThinking(show) {
+      if (!thinkingEl) return;
+      thinkingEl.style.display = show ? 'inline-block' : 'none';
+      // keep it near the latest messages
+      if (show) {
+        thinkingEl.scrollIntoView({ block: 'end' });
+      }
+    }
+    function disableComposer(disabled) {
+      input.disabled = disabled;
+      sendBtn.disabled = disabled;
+    }
+
+    // Send on Enter (Shift+Enter = newline)
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+  </script>
+</body>
+</html>
