@@ -14,7 +14,6 @@
     .msg { position:relative; padding:10px 14px; border-radius:14px; max-width: 800px; line-height:1.5; }
     .user { align-self:flex-end; background:#e6f4ff; color:#1a1a1a; }
     .ai { align-self:flex-start; background:#f1f1f1; color:#1a1a1a; }
-    /* message text container (so copy button doesn't get copied) */
     .msg .content { white-space:pre-wrap; padding-right:56px; }
 
     #composerWrap { background:#fff; border-top:1px solid #e6e6e6; padding:12px; }
@@ -26,7 +25,6 @@
     .linkish { background:#eef7f3; color:#0d876a; border:1px solid #cfe7dd; }
     .linkish:hover { background:#dff2ea; }
 
-    /* per-bubble copy button */
     .copyBtn {
       position:absolute; top:6px; right:8px;
       font-size:12px; padding:4px 8px; border-radius:8px;
@@ -40,19 +38,10 @@
       #actions { flex-direction:column; }
     }
 
-    /* thinking: animated . .. ... indicator */
     .thinking {
-      display:none;
-      opacity:.75;
-      margin:6px 16px;
-      font-size:14px;
-      align-self:flex-start;
-      color:#444;
+      display:none; opacity:.75; margin:6px 16px; font-size:14px; align-self:flex-start; color:#444;
     }
-    .thinking::after {
-      content:"...";
-      animation:dots 1s steps(3,end) infinite;
-    }
+    .thinking::after { content:"..."; animation:dots 1s steps(3,end) infinite; }
     @keyframes dots { 0%{content:"."} 33%{content:".."} 66%{content:"..."} 100%{content:""} }
   </style>
 </head>
@@ -64,8 +53,6 @@
   </div>
 
   <div id="chat"></div>
-
-  <!-- thinking: lives under the chat, shows while waiting -->
   <div id="thinking" class="thinking" aria-live="polite">Thinking</div>
 
   <div id="composerWrap">
@@ -86,14 +73,14 @@
     const sendBtn  = document.getElementById('send');
     const resetBtn = document.getElementById('reset');
     const modelUsedEl = document.getElementById('modelUsed');
-    const thinkingEl  = document.getElementById('thinking'); // thinking
+    const thinkingEl  = document.getElementById('thinking');
+
+    // IMPORTANT: use var to avoid TDZ + declare before any use
+    var msgId = 0; // unique IDs for bubbles so copy buttons can target text only
 
     // Load or seed chat history
     let messages = [];
-    try {
-      messages = JSON.parse(localStorage.getItem('fam_msgs') || '[]');
-    } catch { messages = []; }
-
+    try { messages = JSON.parse(localStorage.getItem('fam_msgs') || '[]'); } catch { messages = []; }
     if (messages.length === 0) {
       messages.push({
         role: 'assistant',
@@ -126,29 +113,21 @@ I’ll build and fine-tune a meal plan you can actually follow.`
       modelUsedEl.textContent = '(actual model: checking…)';
     };
 
-    // ---------- Safe copy utilities (Clipboard API + fallback) ----------
+    // ---------- Safe copy utilities ----------
     function fallbackCopy(text) {
       try {
         const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.setAttribute('readonly', '');
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-      } catch (e) {
-        console.warn('Fallback copy failed', e);
-      }
+        ta.value = text; ta.setAttribute('readonly','');
+        ta.style.position='fixed'; ta.style.opacity='0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+      } catch (e) { console.warn('Fallback copy failed', e); }
     }
     async function safeCopy(text) {
       try {
         if (navigator.clipboard && window.isSecureContext) {
           await navigator.clipboard.writeText(text);
-        } else {
-          fallbackCopy(text);
-        }
+        } else { fallbackCopy(text); }
         return true;
       } catch (e) {
         console.warn('Clipboard API failed', e);
@@ -163,7 +142,7 @@ I’ll build and fine-tune a meal plan you can actually follow.`
       setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 1200);
     }
 
-    // Generic copy handler that reads data-copy or data-copy-text
+    // Generic copy handler (data-copy / data-copy-text)
     document.addEventListener('click', async (e) => {
       const btn = e.target.closest('[data-copy], [data-copy-text]');
       if (!btn) return;
@@ -190,51 +169,37 @@ I’ll build and fine-tune a meal plan you can actually follow.`
       const text = input.value.trim();
       if (!text) return;
 
-      // Add user message locally
       messages.push({ role: 'user', content: text });
       persist();
       appendMessage('user', text);
       input.value = '';
 
-      // thinking: show indicator and disable inputs
       showThinking(true);
       disableComposer(true);
 
-      // Call your API with the CORRECT shape: { messages, model }
       let resp;
       try {
         resp = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages, model: 'gpt-4o' }) // locked to 4o
+          body: JSON.stringify({ messages, model: 'gpt-4o' })
         });
       } catch {
         appendMessage('assistant', 'Sorry — network error. Try again.');
         messages.push({ role: 'assistant', content: 'Sorry — network error. Try again.' });
-        persist();
-        showThinking(false);
-        disableComposer(false);
-        return;
+        persist(); showThinking(false); disableComposer(false); return;
       }
 
       if (!resp.ok) {
         let errText = 'Sorry — the server returned an error.';
-        try {
-          const j = await resp.json();
-          if (j?.error) errText = `Sorry — ${j.error}`;
-        } catch {}
+        try { const j = await resp.json(); if (j?.error) errText = `Sorry — ${j.error}`; } catch {}
         appendMessage('assistant', errText);
         messages.push({ role: 'assistant', content: errText });
-        persist();
-        showThinking(false);
-        disableComposer(false);
-        return;
+        persist(); showThinking(false); disableComposer(false); return;
       }
 
       const data = await resp.json();
-      if (data?.model_used) {
-        modelUsedEl.textContent = `(actual model: ${data.model_used})`;
-      }
+      if (data?.model_used) { modelUsedEl.textContent = `(actual model: ${data.model_used})`; }
 
       const reply = data?.reply || '…';
       appendMessage('assistant', reply);
@@ -246,8 +211,6 @@ I’ll build and fine-tune a meal plan you can actually follow.`
     });
 
     // ---------- Rendering helpers ----------
-    let msgId = 0; // unique IDs for bubbles so copy buttons can target text only
-
     function appendMessage(role, text) {
       const id = `m${++msgId}`;
 
@@ -261,12 +224,11 @@ I’ll build and fine-tune a meal plan you can actually follow.`
       content.textContent = text;
       bubble.appendChild(content);
 
-      // Per-bubble copy button (works for both AI and User)
       const btn = document.createElement('button');
       btn.className = 'copyBtn';
       btn.type = 'button';
       btn.setAttribute('aria-label', 'Copy message');
-      btn.setAttribute('data-copy', `#${id}-content`); // copy only the text div
+      btn.setAttribute('data-copy', `#${id}-content`);
       btn.textContent = 'Copy';
       bubble.appendChild(btn);
 
@@ -276,7 +238,7 @@ I’ll build and fine-tune a meal plan you can actually follow.`
 
     function renderAll() {
       chatEl.innerHTML = '';
-      msgId = 0; // reset so IDs are consistent on render
+      msgId = 0; // reset counter each render
       for (const m of messages) appendMessage(m.role, m.content);
     }
 
@@ -284,23 +246,17 @@ I’ll build and fine-tune a meal plan you can actually follow.`
       localStorage.setItem('fam_msgs', JSON.stringify(messages));
     }
 
-    // thinking: tiny helpers
     function showThinking(show) {
       if (!thinkingEl) return;
       thinkingEl.style.display = show ? 'inline-block' : 'none';
       if (show) thinkingEl.scrollIntoView({ block: 'end' });
     }
     function disableComposer(disabled) {
-      input.disabled = disabled;
-      sendBtn.disabled = disabled;
+      input.disabled = disabled; sendBtn.disabled = disabled;
     }
 
-    // Send on Enter (Shift+Enter = newline)
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        form.requestSubmit();
-      }
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
     });
   </script>
 </body>
