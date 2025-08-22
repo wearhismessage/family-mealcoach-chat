@@ -14,7 +14,8 @@
     .msg { position:relative; padding:10px 14px; border-radius:14px; max-width: 800px; line-height:1.5; }
     .user { align-self:flex-end; background:#e6f4ff; color:#1a1a1a; }
     .ai { align-self:flex-start; background:#f1f1f1; color:#1a1a1a; }
-    .msg .content { white-space:pre-wrap; padding-right:56px; }
+    /* only the text is copied; leave room for the icon button on the right */
+    .msg .content { white-space:pre-wrap; padding-right:48px; }
 
     #composerWrap { background:#fff; border-top:1px solid #e6e6e6; padding:12px; }
     #composer { display:flex; gap:8px; max-width: 980px; margin:0 auto; }
@@ -25,19 +26,32 @@
     .linkish { background:#eef7f3; color:#0d876a; border:1px solid #cfe7dd; }
     .linkish:hover { background:#dff2ea; }
 
+    /* per-bubble copy ICON button */
     .copyBtn {
       position:absolute; top:6px; right:8px;
-      font-size:12px; padding:4px 8px; border-radius:8px;
+      width:auto; /* prevent mobile full-width */
+      display:inline-flex; align-items:center; justify-content:center;
+      padding:6px; border-radius:8px;
       background:#eef7f3; color:#0d876a; border:1px solid #cfe7dd; cursor:pointer;
+      line-height:0;  /* icon-only */
     }
     .copyBtn:hover { background:#dff2ea; }
+    .copyBtn svg { width:16px; height:16px; }
+
+    /* a11y helper (for screen readers if needed later) */
+    .sr-only {
+      position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+      overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+    }
 
     @media (max-width: 640px) {
       #composer { flex-direction:column; }
-      button { width:100%; }
+      /* Only stretch normal buttons, not the floating copy icon */
+      button:not(.copyBtn) { width:100%; }
       #actions { flex-direction:column; }
     }
 
+    /* thinking indicator */
     .thinking {
       display:none; opacity:.75; margin:6px 16px; font-size:14px; align-self:flex-start; color:#444;
     }
@@ -75,8 +89,8 @@
     const modelUsedEl = document.getElementById('modelUsed');
     const thinkingEl  = document.getElementById('thinking');
 
-    // IMPORTANT: use var to avoid TDZ + declare before any use
-    var msgId = 0; // unique IDs for bubbles so copy buttons can target text only
+    // Avoid TDZ: declare before any render
+    var msgId = 0;
 
     // Load or seed chat history
     let messages = [];
@@ -136,10 +150,13 @@ I’ll build and fine-tune a meal plan you can actually follow.`
     }
     function flashButton(btn, ok=true) {
       if (!btn) return;
-      const orig = btn.textContent;
+      btn.classList.toggle('copied', ok);
+      const orig = btn.innerHTML;
       btn.disabled = true;
-      btn.textContent = ok ? 'Copied!' : 'Copy failed';
-      setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 1200);
+      btn.innerHTML = ok
+        ? '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 10.5l-2-2 .7-.7 1.3 1.3 3-3 .7.7-3.7 3.7z"/></svg>'
+        : '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"/></svg>';
+      setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 900);
     }
 
     // Generic copy handler (data-copy / data-copy-text)
@@ -224,12 +241,14 @@ I’ll build and fine-tune a meal plan you can actually follow.`
       content.textContent = text;
       bubble.appendChild(content);
 
+      // Icon-only copy button
       const btn = document.createElement('button');
       btn.className = 'copyBtn';
       btn.type = 'button';
       btn.setAttribute('aria-label', 'Copy message');
+      btn.setAttribute('title', 'Copy');
       btn.setAttribute('data-copy', `#${id}-content`);
-      btn.textContent = 'Copy';
+      btn.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 1h6a2 2 0 012 2v7h-2V3H6V1zm-2 4h6a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V7a2 2 0 012-2zm0 2v7h6V7H4z"/></svg>';
       bubble.appendChild(btn);
 
       chatEl.appendChild(bubble);
