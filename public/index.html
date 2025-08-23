@@ -292,5 +292,21 @@ I’ll build and fine-tune a meal plan you can actually follow.`
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
     });
   </script>
+
+<script>
+(function () {
+  function postHeight() {
+    const h = document.documentElement.scrollHeight || document.body.scrollHeight;
+    window.parent?.postMessage({ type: "mpc-height", height: h }, "*");
+  }
+  window.addEventListener("load", postHeight);
+  window.addEventListener("resize", postHeight);
+  const ro = new ResizeObserver(postHeight);
+  ro.observe(document.documentElement);
+  const mo = new MutationObserver(postHeight);
+  mo.observe(document.body, { childList: true, subtree: true, attributes: true, characterData: true });
+})();
+</script>
+
 </body>
 </html>
