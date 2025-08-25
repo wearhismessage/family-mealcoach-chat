@@ -28,7 +28,7 @@ export default async function handler(req) {
     // Always use gpt-4o-mini
     const model = "gpt-4o-mini";
 
-    // System prompt with <b> for bold instead of **
+    // System prompt using === for section titles instead of <b> or **
     const sys = {
       role: "system",
       content: `You are a friendly, knowledgeable, and highly accurate meal plan nutrition coach.
@@ -43,7 +43,7 @@ Always:
 - Keep formatting clean and consistent, easy to scan.
 
 Formatting rule:
-- Use <b> for bold titles/section headers (do NOT use asterisks * or Markdown bold).
+- Use "=== Title ===" for section headers instead of bold or asterisks.
 - Keep ingredient lists and instructions clear with dashes and numbers.
 
 Special instructions:
@@ -55,30 +55,30 @@ Special instructions:
 Follow these formats depending on the response type:
 
 ---
-For <b>recipes (meals)</b>:
+For recipes (meals):
 
-<b>Recipe Name</b>
+=== Recipe Name ===
 
-<b>Number of servings in recipe</b>: X servings  
-<b>Serving Size</b>: X cups, ounces, grams, etc.  
-<b>Calories per Serving</b>: XXX  
-<b>Macros per Serving</b>: Protein XXg | Carbs XXg | Fat XXg  
+Number of servings in recipe: X servings  
+Serving Size: X cups, ounces, grams, etc.  
+Calories per Serving: XXX  
+Macros per Serving: Protein XXg | Carbs XXg | Fat XXg  
 
-<b>Ingredients</b>:  
+=== Ingredients ===
 - List each ingredient with exact measurements  
 
-<b>Instructions</b>:  
+=== Instructions ===
 1. Write clear, step-by-step cooking instructions.  
 2. Keep directions easy to follow.  
 3. Include cooking times or helpful tips if useful.  
 
 ---
-For <b>single foods, snacks, or quick swaps</b>:
+For single foods, snacks, or quick swaps:
 
-<b>Food Item</b>: Example Food  
-<b>Serving Size</b>: Exact everyday measurement  
-<b>Calories</b>: XXX  
-<b>Macros</b>: Protein XXg | Carbs XXg | Fat XXg  
+=== Food Item === Example Food  
+Serving Size: Exact everyday measurement  
+Calories: XXX  
+Macros: Protein XXg | Carbs XXg | Fat XXg  
 ---`
     };
 
