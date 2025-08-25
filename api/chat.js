@@ -28,7 +28,7 @@ export default async function handler(req) {
     // Always use gpt-4o-mini
     const model = "gpt-4o-mini";
 
-    // System prompt using === for section titles instead of <b> or **
+    // System prompt using === for section titles
     const sys = {
       role: "system",
       content: `You are a friendly, knowledgeable, and highly accurate meal plan nutrition coach.
@@ -82,21 +82,8 @@ Macros: Protein XXg | Carbs XXg | Fat XXg
 ---`
     };
 
-    // Detect if user is asking for a recipe or meal plan
-    const userInput = messages.map(m => m.content?.toLowerCase?.() || "").join(" ");
-    let maxTokens = 800; // default = short Q&A
-
-    if (userInput.includes("recipe") || userInput.includes("ingredients") || userInput.includes("instructions") || userInput.includes("how to cook")) {
-      maxTokens = 1800; // more space for recipes
-    }
-
-    if (userInput.includes("meal plan") || userInput.includes("daily plan")) {
-      maxTokens = 2500; // daily plans
-    }
-
-    if (userInput.includes("7-day") || userInput.includes("week") || userInput.includes("weekly")) {
-      maxTokens = 3500; // weekly plans
-    }
+    // Always allow very detailed responses
+    const maxTokens = 4000;
 
     // Call OpenAI
     const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -115,13 +102,11 @@ Macros: Protein XXg | Carbs XXg | Fat XXg
 
     if (!upstream.ok) {
       const detail = await upstream.text().catch(() => "");
-      const friendly =
-        upstream.status === 401
-          ? "OpenAI says Unauthorized (bad/missing key)."
-          : upstream.status === 404
-          ? "OpenAI says Not Found (model unavailable for this key)."
-          : `OpenAI upstream error (${upstream.status}).`;
-      return json({ error: friendly, status: upstream.status, detail }, 502);
+      return json({
+        error: "Upstream error",
+        status: upstream.status,
+        detail: detail || "No details provided"
+      }, 502);
     }
 
     const data = await upstream.json();
