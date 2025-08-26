@@ -35,7 +35,7 @@
     html, body { height: 100%; }
     body {
       margin:0; background:#fff; color:#222; display:flex; flex-direction:column; min-height:100dvh; overflow-x:hidden;
-      font-family: var(--app-font), var(--emoji-fonts);   /* << font applied */
+      font-family: var(--app-font), var(--emoji-fonts);
     }
 
     /* Ensure controls inherit font */
@@ -63,10 +63,31 @@
       gap:8px;
       -webkit-overflow-scrolling: touch;
     }
+
     .msg { position:relative; padding:8px 12px; border-radius:14px; max-width:800px; line-height:1.5; }
-    .user { align-self:flex-end; background:#f1f1f1; color:#1a1a1a; }
-    .ai   { align-self:flex-start; background:#e6f4ff; color:#1a1a1a; }
-    .msg .content { white-space:pre-wrap; padding-right:44px; padding-bottom:30px; }
+
+    /* Hug edges + swapped colors + chat-tail shape */
+    .user {
+      align-self:flex-end;
+      background:#f1f1f1;   /* user bubble color */
+      color:#1a1a1a;
+      margin-left:auto;     /* push to right edge */
+      border-radius:18px 18px 4px 18px; /* subtle tail bottom-right */
+    }
+    .ai {
+      align-self:flex-start;
+      background:#e6f4ff;   /* AI bubble color */
+      color:#1a1a1a;
+      margin-right:auto;    /* push to left edge */
+      border-radius:18px 18px 18px 4px; /* subtle tail bottom-left */
+    }
+
+    /* Inner content spacing (room for copy button) */
+    .msg .content {
+      white-space:pre-wrap;
+      padding-right:44px;
+      padding-bottom:26px; /* slightly tighter */
+    }
 
     /* Composer (sticky + safe-area) */
     #composerWrap {
@@ -155,6 +176,7 @@
       header { padding:6px 10px; font-size:18px; line-height:1.1; } /* smaller title bar */
       #chat { padding:8px; }
       .actions button { font-size:16px; }
+      .msg { max-width:92%; } /* a bit wider on phones */
     }
 
     /* Embedded (iframe) width fixes */
@@ -364,4 +386,3 @@ I’ll build a plan around your preferences — so include those upfront for the
 
 </body>
 </html>
-
