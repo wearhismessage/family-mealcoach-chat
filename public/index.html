@@ -4,14 +4,32 @@
   <meta charset="utf-8" />
   <title>Meal Plan Hero</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- NEW: detect if running inside an iframe -->
+  <script>
+    (function () {
+      try {
+        if (window.top !== window.self) {
+          document.documentElement.classList.add('embedded');
+        }
+      } catch (_) {
+        document.documentElement.classList.add('embedded');
+      }
+    })();
+  </script>
+
   <style>
     :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
     body { margin:0; background:#ffffff; color:#222; display:flex; flex-direction:column; height:100vh; }
 
-    /* Header (kept compact on mobile) */
+    /* Header (kept compact on mobile; hidden when embedded via rule below) */
     header { padding:12px 16px; background:#ffffff; border-bottom:1px solid #e6e6e6; font-weight:700; text-align:center; }
 
-    /* NEW: reserved ad slot just under header (prevents layout shift) */
+    /* NEW: when embedded (iframe), hide the in-app header to avoid duplicate titles */
+    .embedded header { display:none; }
+    .embedded .ad-top { border-top:1px solid #e6e6e6; } /* subtle divider at top when header is hidden */
+
+    /* Reserved ad slot just under header (prevents layout shift) */
     .ad-top{
       min-height:50px; display:flex; align-items:center; justify-content:center;
       border-bottom:1px solid #eee; background:#fff;
@@ -35,7 +53,7 @@
     #composer { display:flex; flex-direction:column; gap:8px; max-width: 980px; margin:0 auto; }
     textarea { flex:1; resize:none; padding:12px; border-radius:12px; border:1px solid #ccc; background:#fff; color:#222; min-height:56px; }
 
-    /* NEW: side-by-side actions row (Clear left, Send right) */
+    /* Side-by-side actions row (Clear left, Send right) */
     .actions { display:flex; gap:8px; }
     .actions button { flex:1; padding:12px 16px; border:none; border-radius:10px; cursor:pointer; font-weight:600; }
     .actions .clear { background:#f0f5f0; color:#333; border:1px solid #cfe7dd; }
@@ -64,7 +82,7 @@
     .thinking::after { content:"..."; animation:dots 1s steps(3,end) infinite; }
     @keyframes dots { 0%{content:"."} 33%{content:".."} 66%{content:"..."} 100%{content:""} }
 
-    /* NEW: reserved bottom ad (where Clear Chat used to be) */
+    /* Reserved bottom ad (where Clear Chat used to be) */
     .ad-bottom{
       margin-top:8px; min-height:60px; display:flex; align-items:center; justify-content:center;
       border-top:1px solid #eee; background:#fff;
@@ -74,7 +92,6 @@
     @media (max-width: 640px) {
       header { padding:6px 10px; font-size:16px; line-height:1.1; }
       #chat { padding:12px; }
-      /* keep buttons side-by-side on mobile for right-thumb Send */
       .actions button { font-size:16px; }
     }
 
@@ -86,7 +103,7 @@
 </head>
 <body>
 
-  <!-- Header + NEW top ad slot -->
+  <!-- Header + top ad slot -->
   <header>🍽️ Meal Plan Hero</header>
   <div class="ad-top" aria-label="Advertisement">
     <!-- Top ad (e.g., 320x50/300x100 responsive) -->
@@ -99,14 +116,14 @@
     <form id="composer">
       <textarea id="input" placeholder="Tell me your calories & macro targets, foods you like/avoid, cooking time, budget, and meals/day…"></textarea>
 
-      <!-- NEW: side-by-side Clear (left) + Send (right) -->
+      <!-- side-by-side Clear (left) + Send (right) -->
       <div class="actions">
         <button id="reset" class="clear" type="button">Clear Chat</button>
         <button id="send" class="send" type="submit">Send</button>
       </div>
     </form>
 
-    <!-- NEW: bottom ad slot (replaces old Clear Chat area) -->
+    <!-- bottom ad slot -->
     <div class="ad-bottom" aria-label="Advertisement">
       <!-- Bottom ad (e.g., 320x50/300x100 responsive) -->
     </div>
