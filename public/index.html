@@ -5,6 +5,11 @@
   <title>Meal Plan Hero</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
+  <!-- Google Fonts: Roboto (fallback to Arial/system if blocked) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
   <!-- Detect if running inside an iframe -->
   <script>
     (function () {
@@ -19,10 +24,22 @@
   </script>
 
   <style>
+    /* --- Global font (Roboto with fallbacks) --- */
+    :root {
+      --app-font: "Roboto", Arial, "Segoe UI", system-ui, -apple-system, "Noto Sans", sans-serif;
+      --emoji-fonts: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+    }
+
     /* --- global/mobile guards --- */
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; }
-    body { margin:0; background:#fff; color:#222; display:flex; flex-direction:column; min-height:100dvh; overflow-x:hidden; }
+    body {
+      margin:0; background:#fff; color:#222; display:flex; flex-direction:column; min-height:100dvh; overflow-x:hidden;
+      font-family: var(--app-font), var(--emoji-fonts);   /* << font applied */
+    }
+
+    /* Ensure controls inherit font */
+    button, input, select, textarea { font: inherit; }
 
     /* Header (hidden when embedded) */
     header {
@@ -154,7 +171,7 @@
 
   <div id="composerWrap">
     <form id="composer">
-      <textarea id="input" placeholder="Tell me your calories & macro targets, foods you like/avoid, cooking time, budget, and meals/day…"></textarea>
+      <textarea id="input" placeholder="Example: 2300 high-protein, egg whites for breakfast, no dairy."></textarea>
       <div class="actions">
         <button id="reset" class="clear" type="button">Clear Chat</button>
         <button id="send" class="send" type="submit">Send</button>
@@ -177,38 +194,26 @@
     const thinkingEl  = document.getElementById('thinking');
     var msgId = 0;
 
+    // New greeting (plain text)
+    const GREETING = `👋 Hi! I’m your meal plan coach.
+Just tell me:
+• Calories & goal (ex: 2300 high-protein)
+• Any foods you want (ex: egg whites, steak)
+• Any foods to avoid (ex: dairy, shrimp)
+
+I’ll build a plan around your preferences — so include those upfront for the best results!
+(Need recipes, tips, or quick swaps? Just ask anytime.)`;
+
     // Load or seed chat history
     let messages = [];
     try { messages = JSON.parse(localStorage.getItem('fam_msgs') || '[]'); } catch { messages = []; }
     if (messages.length === 0) {
-      messages.push({
-        role: 'assistant',
-        content:
-`Hi! I’m your meal plan coach. Tell me:
-• Calories & macro targets (protein/carbs/fat)
-• Foods you like/avoid
-• Cooking time & budget
-• Number of meals/day
-• Special diet? (keto, vegan, etc)
-I’ll build and fine-tune a meal plan you can actually follow.
-Need a recipe or cooking tips? No problem!`
-      });
+      messages.push({ role: 'assistant', content: GREETING });
     }
     renderAll();
 
     resetBtn.onclick = () => {
-      messages = [{
-        role: 'assistant',
-        content:
-`Hi! I’m your meal plan coach. Tell me:
-• Calories & macro targets (protein/carbs/fat)
-• Foods you like/avoid
-• Cooking time & budget
-• Number of meals/day
-• Special diet? (keto, vegan, etc)
-I’ll build and fine-tune a meal plan you can actually follow.
-Need a recipe or cooking tips? No problem!`
-      }];
+      messages = [{ role: 'assistant', content: GREETING }];
       persist();
       renderAll();
       modelUsedEl.textContent = '(actual model: checking…)';
