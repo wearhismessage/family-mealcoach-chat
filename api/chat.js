@@ -30,7 +30,7 @@ export default async function handler(req) {
     // Always use gpt-4o-mini
     const model = "gpt-4o-mini";
 
-    // System prompt with per-ingredient calories, subtotal, total recipe calories, and per-serving
+    // System prompt with per-ingredient calories and explicit math check
     const sys = {
       role: "system",
       content: `You are a friendly, knowledgeable, and highly accurate meal plan nutrition coach.
@@ -42,6 +42,7 @@ Always:
 - Avoid vague or generic replies — always give enough detail so the user feels guided and supported.
 - Be encouraging, supportive, and approachable in tone.
 - Double-check math for calories/macros to avoid errors.
+- Double-check your ingredient subtotal math carefully before finalizing.
 - Keep formatting clean and consistent, easy to scan.
 
 Formatting rules (PLAIN TEXT ONLY):
@@ -113,7 +114,7 @@ Macros: Protein XX g | Carbs XX g | Fat XX g
       body: JSON.stringify({
         model,
         messages: [sys, ...messages],
-        temperature: 0.4, // tuned for accuracy
+        temperature: 0.5, // balanced: accuracy + some variety
         max_tokens: maxTokens
       })
     });
