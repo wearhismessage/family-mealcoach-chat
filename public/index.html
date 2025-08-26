@@ -23,7 +23,7 @@
     body { margin:0; background:#ffffff; color:#222; display:flex; flex-direction:column; height:100vh; }
 
     header { padding:12px 16px; background:#ffffff; border-bottom:1px solid #e6e6e6; font-weight:700; text-align:center; }
-    .embedded header { display:none; }
+    .embedded header { display:none; }                 /* hide title inside iframe */
     .embedded .ad-top { border-top:1px solid #e6e6e6; }
 
     .ad-top{
@@ -66,8 +66,8 @@
 
     .msg .content { white-space: pre-wrap; padding-right: 48px; padding-bottom: 36px; }
 
-    /* Densify composer bottom padding to reduce gap above ad */
-    #composerWrap { background:#fff; border-top:1px solid #e6e6e6; padding:12px 12px 6px; } /* was 12px all around */
+    /* Composer */
+    #composerWrap { background:#fff; border-top:1px solid #e6e6e6; padding:12px 12px 6px; }
     #composer { display:flex; flex-direction:column; gap:8px; max-width: 980px; margin:0 auto; }
     textarea { flex:1; resize:none; padding:12px; border-radius:12px; border:1px solid #ccc; background:#fff; color:#222; min-height:56px; margin:0; }
 
@@ -95,6 +95,7 @@
     .thinking::after { content:"..."; animation:dots 1s steps(3,end) infinite; }
     @keyframes dots { 0%{content:"."} 33%{content:".."} 66%{content:"..."} 100%{content:""} }
 
+    /* Mobile tweaks */
     @media (max-width: 640px) {
       header { padding:6px 10px; font-size:16px; line-height:1.1; }
       #chat { padding:12px; }
@@ -102,8 +103,12 @@
     }
 
     @media (min-width: 1024px) {
-      .ad-bottom { height: 100px; } /* keep 100px on desktop for now */
+      .ad-bottom { height: 50px; } /* keep 50px on desktop for now */
     }
+
+    /* --- EMBEDDED (iframe) WIDTH FIXES --- */
+    .embedded #composer { max-width: none; width: 100%; }  /* full width composer */
+    .embedded #chat { padding-left: 12px; padding-right: 12px; } /* tighter chat padding */
 
     /* OPTIONAL: when typing, collapse bottom ad for max space */
     .kbd-open .ad-bottom { height: 0 !important; border-top: none; }
@@ -352,5 +357,3 @@ Need a recipe or cooking tips? No problem!`
   </script>
 </body>
 </html>
-
-
