@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>Meal Plan Hero</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
   <!-- Detect if running inside an iframe -->
   <script>
@@ -19,28 +19,94 @@
   </script>
 
   <style>
-    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    body { margin:0; background:#fff; color:#222; display:flex; flex-direction:column; height:100vh; }
+    /* --- global/mobile guards --- */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin:0; background:#fff; color:#222; display:flex; flex-direction:column; min-height:100dvh; overflow-x:hidden; }
 
     /* Header (hidden when embedded) */
-    header { padding:10px 12px; background:#fff; border-bottom:1px solid #e6e6e6; font-weight:700; text-align:center; }
+    header {
+      padding:8px 10px;            /* tighter */
+      background:#fff;
+      border-bottom:1px solid #e6e6e6;
+      font-weight:700;
+      text-align:center;
+      line-height:1.2;
+    }
     .embedded header { display:none; }
 
     /* Chat area */
-    #chat { flex:1; overflow:auto; padding:10px; background:#fafafa; display:flex; flex-direction:column; gap:8px; }
+    #chat {
+      flex:1;
+      overflow:auto;
+      padding:10px;
+      background:#fafafa;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      -webkit-overflow-scrolling: touch;
+    }
     .msg { position:relative; padding:8px 12px; border-radius:14px; max-width:800px; line-height:1.5; }
     .user { align-self:flex-end; background:#e6f4ff; color:#1a1a1a; }
     .ai   { align-self:flex-start; background:#f1f1f1; color:#1a1a1a; }
     .msg .content { white-space:pre-wrap; padding-right:44px; padding-bottom:30px; }
 
-    /* Composer (tight) */
-    #composerWrap { background:#fff; border-top:1px solid #e6e6e6; padding:8px 8px 4px; }
-    #composer { display:flex; flex-direction:column; gap:6px; max-width:980px; margin:0 auto; }
-    textarea { flex:1; resize:none; padding:10px; border-radius:12px; border:1px solid #ccc; background:#fff; color:#222; min-height:52px; margin:0; }
+    /* Composer (sticky + safe-area) */
+    #composerWrap {
+      position: sticky;
+      bottom: 0;
+      left: 0; right: 0;
+      background:#fff;
+      border-top:1px solid #e6e6e6;
+      padding:8px 8px 12px;        /* extra bottom for safe-area */
+      z-index: 5;
+    }
+    @supports (padding: max(0px)) {
+      #composerWrap { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+    }
+
+    #composer {
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      max-width:980px;
+      margin:0 auto;
+      width:100%;
+      min-width:0;                 /* prevent overflow on small screens */
+    }
+
+    textarea {
+      flex:1 1 auto;
+      width:100%;
+      min-width:0;                 /* critical for mobile flex overflow */
+      resize:none;
+      padding:10px;
+      border-radius:12px;
+      border:1px solid #ccc;
+      background:#fff;
+      color:#222;
+      min-height:52px;
+      margin:0;
+    }
 
     /* Side-by-side actions */
-    .actions { display:flex; gap:6px; margin:0; }
-    .actions button { flex:1; padding:10px 14px; border:none; border-radius:10px; cursor:pointer; font-weight:600; }
+    .actions {
+      display:flex;
+      gap:6px;
+      margin:0;
+      align-items:center;
+      flex-wrap:nowrap;            /* keep on one line */
+      min-width:0;
+    }
+    .actions button {
+      flex:1 1 0;
+      padding:10px 14px;
+      border:none;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:600;
+      white-space:nowrap;          /* avoid wrapping text that widens layout */
+    }
     .actions .clear { background:#f0f5f0; color:#333; border:1px solid #cfe7dd; }
     .actions .clear:hover { background:#e8f2ec; }
     .actions .send { background:#10a37f; color:#fff; }
@@ -69,7 +135,7 @@
 
     /* Mobile tweaks */
     @media (max-width:640px){
-      header { padding:6px 10px; font-size:16px; line-height:1.1; }
+      header { padding:6px 10px; font-size:18px; line-height:1.1; } /* smaller title bar */
       #chat { padding:8px; }
       .actions button { font-size:16px; }
     }
