@@ -34,7 +34,7 @@
     /* --- Option A: fixed-height bottom slot, content pinned to top --- */
     .ad-bottom{
       margin-top: 0;
-      height: 100px;                 /* fixed height (no vertical centering gap) */
+      height: 50px;                 /* fixed height (no vertical centering gap) */
       display: flex;
       align-items: flex-start;       /* top-align content */
       justify-content: center;       /* center horizontally */
@@ -44,7 +44,7 @@
     /* Exact creative size inside the bottom slot */
     .ad-bottom .ad-placeholder{
       width: 320px;
-      height: 100px;
+      height: 500px;
       max-width: 100%;
       margin: 0;
     }
@@ -130,7 +130,7 @@
     </form>
 
     <div class="ad-bottom" aria-label="Advertisement">
-      <div class="ad-placeholder">Your Ad Here (320×100 mobile / 728×100 desktop)</div>
+      <div class="ad-placeholder">Your Ad Here (320×50 mobile / 728×50 desktop)</div>
     </div>
   </div>
 
@@ -352,3 +352,4 @@ Need a recipe or cooking tips? No problem!`
   </script>
 </body>
 </html>
+
