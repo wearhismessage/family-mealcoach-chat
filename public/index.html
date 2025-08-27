@@ -172,8 +172,15 @@
     .copyBtn:hover { background:#dff2ea; }
     .copyBtn svg { width:16px; height:16px; }
 
-    /* Thinking indicator */
-    .thinking { display:none; opacity:.75; margin:6px 12px; font-size:14px; align-self:flex-start; color:#444; }
+    /* Thinking indicator (base) */
+    .thinking { 
+      display:none; 
+      opacity:.75; 
+      margin:6px 12px; 
+      font-size:14px; 
+      align-self:flex-start; 
+      color:#444; 
+    }
     .thinking::after { content:"..."; animation:dots 1s steps(3,end) infinite; }
     @keyframes dots { 0%{content:"."} 33%{content:".."} 66%{content:"..."} 100%{content:""} }
 
@@ -194,6 +201,18 @@
     /* Embedded (iframe) width fixes */
     .embedded #composer { max-width:none; width:100%; }           /* full width composer */
     .embedded #chat { padding-left:8px; padding-right:8px; }      /* tighter side padding */
+
+    /* === EMPHASIZE Thinking indicator (override) === */
+    .thinking {
+      display: none;           /* still controlled by JS */
+      opacity: .95;
+      margin: 8px 12px;
+      font-size: 18px;         /* bigger */
+      font-weight: 700;        /* bold */
+      color: #333;
+      align-self: flex-start;  /* keep position consistent */
+    }
+    /* === END EMPHASIZE === */
   </style>
 </head>
 <body>
